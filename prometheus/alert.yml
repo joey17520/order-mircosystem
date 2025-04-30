@@ -1,0 +1,40 @@
+groups:
+  - name: host-monitoring
+    rules:
+      - alert: HostOutOfMemory
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host memory exhausted ({{ $labels.instance }})"
+          description: "Available memory is only {{ $value }}%"
+
+      - alert: HostDiskSpaceRunningLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"} < 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host disk space low ({{ $labels.instance }})"
+          description: "Available disk space is only {{ $value }}%"
+
+  - name: service-errors
+    rules:
+      - alert: HighErrorRate
+        expr: rate(errors_total[1m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is {{ $value }} for service {{ $labels.service }}"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le)) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s"

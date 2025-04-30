@@ -1,0 +1,210 @@
+
+services:
+  consul:
+    image: consul:1.15.4
+    container_name: consul-server
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+      - "8600:8600/tcp"
+      - "8300:8300"
+      - "8301:8301/tcp"
+      - "8301:8301/udp"
+      - "8302:8302/tcp"
+      - "8302:8302/udp"
+    command: "agent -server -bootstrap-expect=1 -ui -client=0.0.0.0"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8500/v1/status/leader" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - observability_net
+
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.35
+    container_name: jaeger-server
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "4318:4318"
+      - "9411:9411"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+    networks:
+      - observability_net
+
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    container_name: "rabbitmq-management"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=ltmso17520
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - observability_net
+
+  prometheus:
+    image: prom/prometheus:v2.37.0
+    container_name: prometheus  # 指定容器名称
+    restart: unless-stopped  # 自动重启策略(除非手动停止)
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert.yml:/etc/prometheus/alert.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'  # 指定数据存储路径
+      - '--storage.tsdb.retention.time=30d'	# 保留30天的监控数据
+    networks:
+      - observability_net
+    depends_on:
+      - alertmanager
+      - node-exporter
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    networks:
+      - observability_net
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - observability_net
+
+  grafana:
+    image: grafana/grafana:9.3.2
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - observability_net
+    depends_on:
+      - prometheus
+
+  api-service:
+    build:
+      context: ./api-service
+      dockerfile: Dockerfile
+    container_name: api-service
+    environment:
+      - TZ=Asia/Shanghai   # 设置为中国时区
+    ports:
+      - "8080:8080"
+    depends_on:
+      - consul
+      - rabbitmq
+      - order-service
+    networks:
+      - observability_net
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    environment:
+      - TZ=Asia/Shanghai   # 设置为中国时区
+    ports:
+      - "50051:50051"
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - consul
+      - rabbitmq
+    networks:
+      - observability_net
+
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    environment:
+      - TZ=Asia/Shanghai   # 设置为中国时区
+    ports:
+      - "50052:50052"
+      - "8082:8082"
+    healthcheck:
+      test: [ "CMD", "grpc_health_probe", "-addr=:50052" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - consul
+      - rabbitmq
+    networks:
+      - observability_net
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    environment:
+      - TZ=Asia/Shanghai   # 设置为中国时区
+    ports:
+      - "50053:50053"
+      - "8083:8083"
+    healthcheck:
+      test: [ "CMD", "grpc_health_probe", "-addr=:50053" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - consul
+      - rabbitmq
+    networks:
+      - observability_net
+
+networks:
+  observability_net:
+
+volumes:
+  rabbitmq_data:
+  grafana_data:
+  prometheus_data:

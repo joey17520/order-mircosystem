@@ -1,0 +1,30 @@
+# 全局配置
+global:
+  resolve_timeout: 5m  # 告警解决后超时标记为已解决
+
+# 告警路由配置
+route:
+  group_by: ['alertname']  # 按告警名称分组
+  group_wait: 10s  # 初次等待时间(收集同组告警)
+  group_interval: 5m  # 同一组告警再次发送间隔
+  repeat_interval: 3h  # 相同告警重复发送间隔
+  receiver: 'email'  # 默认接收器
+
+# 接收器配置
+receivers:
+  - name: 'email'  # 接收器名称
+    email_configs:
+      - to: 'your-email@example.com'  # 收件人
+        from: 'alertmanager@example.com'  # 发件人
+        smarthost: 'smtp.example.com:587'  # SMTP服务器
+        auth_username: 'alertmanager@example.com'  # SMTP用户名
+        auth_password: 'your-password'  # SMTP密码
+        require_tls: false  # 启用TLS加密
+
+# 抑制规则 - 减少重复告警
+inhibit_rules:
+  - source_match:  # 当有严重告警时...
+      severity: 'critical'
+    target_match:  # ...抑制相同实例的警告级别告警
+      severity: 'warning'
+    equal: ['alertname', 'instance']  # 匹配相同告警名称和实例

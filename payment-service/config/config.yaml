@@ -1,0 +1,30 @@
+server:
+  port: 50053
+  host: 0.0.0.0
+  metrics_port: 8083
+
+database:
+  mysql:
+    host: mysql
+    port: 3306
+    username: root
+    password: password
+    database: payment_db
+
+rabbitmq:
+  host: rabbitmq
+  port: 5672
+  username: guest
+  password: guest
+  exchange: order_exchange
+
+consul:
+  host: consul
+  port: 8500
+  service_name: payment-service
+  service_id: payment-service-1
+
+jaeger:
+  agent_host: jaeger
+  agent_port: 14268
+  service_name: payment-service

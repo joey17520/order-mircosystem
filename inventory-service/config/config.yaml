@@ -1,0 +1,30 @@
+server:
+  port: 50052
+  host: 0.0.0.0
+  metrics_port: 8082
+
+database:
+  mysql:
+    host: mysql
+    port: 3306
+    username: root
+    password: password
+    database: inventory_db
+
+rabbitmq:
+  host: rabbitmq
+  port: 5672
+  username: guest
+  password: guest
+  exchange: order_exchange
+
+consul:
+  host: consul
+  port: 8500
+  service_name: inventory-service
+  service_id: inventory-service-1
+
+jaeger:
+  agent_host: jaeger
+  agent_port: 14268
+  service_name: inventory-service

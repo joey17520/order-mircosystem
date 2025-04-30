@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package payment;
+option go_package = "payment-service/pkg/proto/payment";
+
+service PaymentService {
+    rpc GetPayment (GetPaymentRequest) returns (GetPaymentResponse) {};
+    rpc GetAllPayment(GetAllPaymentRequest) returns (GetAllPaymentResponse) {};
+}
+
+message Payment {
+    string payment_id = 1;
+    string user_id = 2;
+    string order_id = 3;
+    int64 totalPrice = 4;
+}
+
+message GetPaymentRequest {
+    string user_id = 1;
+}
+
+message GetPaymentResponse {
+    Payment payment = 1;
+}
+
+message GetAllPaymentRequest {
+    string user_id = 1;
+}
+
+message GetAllPaymentResponse {
+    repeated Payment payments = 1;
+}

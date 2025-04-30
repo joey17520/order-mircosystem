@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s  # 评估告警规则的频率
+  external_labels: # 应用于所有时序数据的外部标签
+    monitor: 'docker-monitor'  # 标识此监控实例
+
+# 告警规则文件路径(容器内路径)
+rule_files:
+  - /etc/prometheus/alert.yaml
+
+scrape_configs:
+  - job_name: 'api-service'
+    static_configs:
+      - targets: ['api-service:8080']
+  
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:8081']
+    metrics_path: '/metrics'
+  
+  - job_name: 'inventory-service' 
+    static_configs:
+      - targets: ['inventory-service:8082']
+  
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['payment-service:8083']
+  # 监控Prometheus自身
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: [ 'localhost:9090' ]  # Prometheus自身指标端点
+
+  # 监控Node Exporter
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: [ 'node-exporter:9100' ]  # 使用Docker服务名访问
+
+  # 监控Alertmanager
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: [ 'alertmanager:9093' ]
+
+# 告警管理器配置
+alerting:
+  alertmanagers:
+    - scheme: http  # 使用HTTP协议
+      static_configs:
+        - targets: ['alertmanager:9093']  # Alertmanager地址

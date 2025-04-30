@@ -1,0 +1,36 @@
+server:
+  port: 50051
+  host: 0.0.0.0
+  metrics_port: 8081
+
+database:
+  mongo:
+    host: mongodb
+    port: 27017
+    database: order_db
+    username: admin
+    password: admin
+
+redis:
+  host: redis
+  port: 6379
+  password: password
+  database: 0
+
+rabbitmq:
+  host: rabbitmq
+  port: 5672
+  username: guest
+  password: guest
+  exchange: order_exchange
+
+consul:
+  host: consul
+  port: 8500
+  service_name: order-service
+  service_id: order-service-1
+
+jaeger:
+  agent_host: jaeger
+  agent_port: 14268
+  service_name: order-service

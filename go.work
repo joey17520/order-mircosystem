@@ -1,0 +1,9 @@
+go 1.23.8
+
+use (
+./api-service
+./inventory-service
+./order-service
+./payment-service
+./proto
+)

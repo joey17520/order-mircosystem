@@ -1,0 +1,23 @@
+syntax = "proto3";
+package inventory;
+option go_package = "inventory-service/pkg/proto/inventory";
+
+service InventoryService {
+    rpc GetAllInventory(GetAllInventoryRequest) returns(GetAllInventoryResponse);
+}
+
+message Product {
+    int64 product_id = 1;
+    string product_name = 2;
+    int64 price = 3;
+    int64 quantity = 4;
+}
+
+message GetAllInventoryRequest {
+    int32 offset = 1;
+    int32 limit = 2;
+}
+
+message GetAllInventoryResponse {
+    repeated Product products = 1;
+}
