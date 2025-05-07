@@ -8,8 +8,11 @@
 - **服务通信**：gRPC
 - **分布式追踪**：OpenTelemetry、Jaeger
 - **监控告警**：Prometheus、Grafana、Alertmanager
+- **日志采集**：ELK Stack
+- **熔断限流**：Hystrix-Go
 - **消息队列**：RabbitMQ
 - **数据库**：MongoDB、MySQL
+- **缓存**：Redis
 
 ```MERMAID
 sequenceDiagram

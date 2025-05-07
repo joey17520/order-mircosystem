@@ -3,7 +3,9 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -20,6 +22,14 @@ type InventoryProxy struct {
 }
 
 func NewInventoryProxy(cfg *config.Config) (*InventoryProxy, error) {
+	hystrix.ConfigureCommand("InventoryProxy", hystrix.CommandConfig{
+		Timeout:                cfg.Hystrix.Timeout,
+		MaxConcurrentRequests:  cfg.Hystrix.MaxConcurrentRequests,
+		RequestVolumeThreshold: cfg.Hystrix.RequestVolumeThreshold,
+		SleepWindow:            cfg.Hystrix.SleepWindow,
+		ErrorPercentThreshold:  cfg.Hystrix.ErrorPercentThreshold,
+	})
+
 	consulConfig := api.DefaultConfig()
 	consulConfig.Address = cfg.Consul.Address
 
@@ -70,21 +80,34 @@ func NewInventoryProxy(cfg *config.Config) (*InventoryProxy, error) {
 }
 
 func (p *InventoryProxy) GetAllInventory(ctx context.Context, offset int32, limit int32) ([]*model.Inventory, error) {
-	resp, err := p.client.GetAllInventory(ctx, &pb.GetAllInventoryRequest{
-		Offset: offset,
-		Limit:  limit,
+	var inventories []*model.Inventory
+
+	err := hystrix.Do("InventoryService", func() error {
+		resp, err := p.client.GetAllInventory(ctx, &pb.GetAllInventoryRequest{
+			Offset: offset,
+			Limit:  limit,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, item := range resp.Products {
+			inventories = append(inventories, &model.Inventory{
+				ProductID:   item.ProductId,
+				ProductName: item.ProductName,
+				Price:       item.Price,
+				Quantity:    item.Quantity,
+			})
+		}
+
+		return nil
+	}, func(err error) error {
+		return errors.Errorf("fallback triggered due to error: %v", err)
 	})
+
 	if err != nil {
 		return nil, err
 	}
-	var inventories []*model.Inventory
-	for _, item := range resp.Products {
-		inventories = append(inventories, &model.Inventory{
-			ProductID:   item.ProductId,
-			ProductName: item.ProductName,
-			Price:       item.Price,
-			Quantity:    item.Quantity,
-		})
-	}
+
 	return inventories, nil
 }

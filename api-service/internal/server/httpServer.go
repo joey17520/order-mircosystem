@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"log"
 	"order-microsystem/api-service/internal/controller"
@@ -23,8 +24,9 @@ type HTTPServer struct {
 	tracer         *tracing.TracerProviderWrapper
 }
 
-func NewHTTPServer(config *config.Config, tracer *tracing.TracerProviderWrapper) *HTTPServer {
-	orderProxy, err := proxy.NewOrderProxy(config)
+func NewHTTPServer(config *config.Config, tracer *tracing.TracerProviderWrapper, logger *logrus.Logger) *HTTPServer {
+
+	orderProxy, err := proxy.NewOrderProxy(config, logger)
 	inventoryProxy, err := proxy.NewInventoryProxy(config)
 
 	if err != nil {

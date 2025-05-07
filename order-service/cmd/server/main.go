@@ -44,7 +44,11 @@ func main() {
 	}()
 
 	// 构建 MongoDB 连接 URI
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d", cfg.Database.Mongo.Username, cfg.Database.Mongo.Password, cfg.Database.Mongo.Host, cfg.Database.Mongo.Port)
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:%d",
+		cfg.Database.Mongo.Username,
+		cfg.Database.Mongo.Password,
+		cfg.Database.Mongo.Host,
+		cfg.Database.Mongo.Port)
 	// 连接 MongoDB 数据库
 	mongoClient, err := database.NewMongoDB(uri)
 	if err != nil {

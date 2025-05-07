@@ -46,12 +46,29 @@ type JaegerConfig struct {
 	ServiceName string `mapstructure:"service_name" yaml:"service_name"`
 }
 
+type HystrixConfig struct {
+	Timeout                int `mapstructure:"timeout" yaml:"timeout"`
+	MaxConcurrentRequests  int `mapstructure:"max_concurrent_requests" yaml:"max_concurrent_requests"`
+	RequestVolumeThreshold int `mapstructure:"request_volume_threshold" yaml:"request_volume_threshold"`
+	SleepWindow            int `mapstructure:"sleep_window" yaml:"sleep_window"`
+	ErrorPercentThreshold  int `mapstructure:"error_percent_threshold" yaml:"error_percent_threshold"`
+}
+
+type LoggerConfig struct {
+	ServiceName  string `mapstructure:"service_name" yaml:"service_name"`
+	LogStashHost string `mapstructure:"log_stash_host" yaml:"log_stash_host"`
+	LogStashPort int    `mapstructure:"log_stash_port" yaml:"log_stash_port"`
+	Async        bool   `mapstructure:"async" yaml:"async"`
+}
+
 type Config struct {
 	Server  ServerConfig  `yaml:"server"`
 	Consul  ConsulConfig  `yaml:"consul"`
 	Service ServiceConfig `yaml:"proxy"`
 	CORS    CorsConfig    `yaml:"cors"`
 	Jaeger  JaegerConfig  `yaml:"jaeger"`
+	Hystrix HystrixConfig `yaml:"hystrix"`
+	Logger  LoggerConfig  `yaml:"logger"`
 }
 
 func LoadConfig(path string) (*Config, error) {

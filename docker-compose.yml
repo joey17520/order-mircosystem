@@ -122,6 +122,62 @@ services:
     depends_on:
       - prometheus
 
+  elasticsearch:
+    image: elasticsearch:7.17.28
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ELASTIC_PASSWORD=password
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+      - ./elk-stack/elasticsearch/templates:/usr/share/elasticsearch/templates
+      - ./elk-stack/ik:/usr/share/elasticsearch/plugins/ik
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:password http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"' || exit 1"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+    networks:
+      - observability_net
+
+  logstash:
+    image: logstash:7.17.28
+    container_name: logstash
+    volumes:
+      - ./elk-stack/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./elk-stack/logstash/templates:/usr/share/logstash/templates
+    ports:
+      - "5000:5000"
+    environment:
+      - LS_JAVA_OPTS=-Xms512m -Xmx512m
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - observability_net
+
+  kibana:
+    image: kibana:7.17.28
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - LS_JAVA_OPTS=-Xms512m -Xmx512m
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=password
+    volumes:
+      - ./elk-stack/kibana.yml:/usr/share/kibana/config/kibana.yml
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - observability_net
+
   api-service:
     build:
       context: ./api-service

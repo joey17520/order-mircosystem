@@ -3,7 +3,9 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/hashicorp/consul/api"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -17,9 +19,18 @@ import (
 type OrderProxy struct {
 	client pb.OrderServiceClient
 	conn   *grpc.ClientConn
+	logger *logrus.Logger
 }
 
-func NewOrderProxy(cfg *config.Config) (*OrderProxy, error) {
+func NewOrderProxy(cfg *config.Config, logger *logrus.Logger) (*OrderProxy, error) {
+	hystrix.ConfigureCommand("OrderProxy", hystrix.CommandConfig{
+		Timeout:                cfg.Hystrix.Timeout,
+		MaxConcurrentRequests:  cfg.Hystrix.MaxConcurrentRequests,
+		RequestVolumeThreshold: cfg.Hystrix.RequestVolumeThreshold,
+		SleepWindow:            cfg.Hystrix.SleepWindow,
+		ErrorPercentThreshold:  cfg.Hystrix.ErrorPercentThreshold,
+	})
+
 	consulConfig := api.DefaultConfig()
 	consulConfig.Address = cfg.Consul.Address
 
@@ -35,6 +46,7 @@ func NewOrderProxy(cfg *config.Config) (*OrderProxy, error) {
 		time.Sleep(time.Second * time.Duration(i+1))
 	}
 	if err != nil {
+		logger.WithError(err).Errorf("failed to create consul client: %v", err)
 		return nil, fmt.Errorf("failed to create consul client: %v", err)
 	}
 
@@ -44,6 +56,7 @@ func NewOrderProxy(cfg *config.Config) (*OrderProxy, error) {
 	}
 
 	if len(services) == 0 {
+		logger.Errorf("no healthy instances available")
 		return nil, fmt.Errorf("no healthy instances available")
 	}
 
@@ -60,48 +73,66 @@ func NewOrderProxy(cfg *config.Config) (*OrderProxy, error) {
 		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "round_robin"}`),
 	)
 	if err != nil {
+		logger.WithError(err).Errorf("failed to connect to grpc server: %v", err)
 		return nil, fmt.Errorf("failed to connect to grpc server: %v", err)
 	}
 
 	return &OrderProxy{
 		client: pb.NewOrderServiceClient(conn),
 		conn:   conn,
+		logger: logger,
 	}, nil
 }
 
 func (p *OrderProxy) CreateOrder(ctx *context.Context, order *model.CreateOrderReq) (*model.Order, error) {
-	var items []*pb.OrderItem
-	for _, item := range order.Items {
-		items = append(items, &pb.OrderItem{
-			ProductId: item.ProductID,
-			Quantity:  item.Quantity,
-			Price:     item.Price,
-		})
-	}
-	req := &pb.CreateOrderRequest{
-		CustomerId: order.CustomerID.String(),
-		Items:      items,
+	var respOrder *model.Order
+
+	err := hystrix.Do("CreateOrder", func() error {
+		var items []*pb.OrderItem
+		for _, item := range order.Items {
+			items = append(items, &pb.OrderItem{
+				ProductId: item.ProductID,
+				Quantity:  item.Quantity,
+				Price:     item.Price,
+			})
+		}
+		req := &pb.CreateOrderRequest{
+			CustomerId: order.CustomerID.String(),
+			Items:      items,
+		}
+
+		resp, err := p.client.CreateOrder(*ctx, req)
+		if err != nil {
+			p.logger.WithError(err).Errorf("failed to create order: %v", err)
+			return fmt.Errorf("failed to create order: %v", err)
+		}
+		var orderItems []model.OrderItem
+		for _, item := range resp.Order.Items {
+			orderItems = append(orderItems, model.OrderItem{
+				ProductID: item.ProductId,
+				Quantity:  item.Quantity,
+				Price:     item.Price,
+			})
+		}
+
+		respOrder = &model.Order{
+			ID:         resp.Order.Id,
+			CustomerID: resp.Order.CustomerId,
+			Items:      orderItems,
+			TotalPrice: resp.Order.TotalPrice,
+			Status:     resp.Order.Status,
+			CreatedAt:  resp.Order.CreatedAt,
+			UpdatedAt:  resp.Order.UpdatedAt,
+		}
+		return nil
+
+	}, func(err error) error {
+		return fmt.Errorf("fallback triggered due to error: %v", err)
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	resp, err := p.client.CreateOrder(*ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create order: %v", err)
-	}
-	var orderItems []model.OrderItem
-	for _, item := range resp.Order.Items {
-		orderItems = append(orderItems, model.OrderItem{
-			ProductID: item.ProductId,
-			Quantity:  item.Quantity,
-			Price:     item.Price,
-		})
-	}
-	return &model.Order{
-		ID:         resp.Order.Id,
-		CustomerID: resp.Order.CustomerId,
-		Items:      orderItems,
-		TotalPrice: resp.Order.TotalPrice,
-		Status:     resp.Order.Status,
-		CreatedAt:  resp.Order.CreatedAt,
-		UpdatedAt:  resp.Order.UpdatedAt,
-	}, nil
+	return respOrder, nil
 }

@@ -28,3 +28,16 @@ jaeger:
   agent_host: "jaeger"
   agent_port: 14268
   service_name: "api-service"
+
+hystrix:
+  timeout: 1000
+  max_concurrent_requests: 100
+  error_percent_threshold: 25
+  request_volume_threshold: 10
+  sleep_window: 5000
+
+logger:
+  service_name: "api-service"
+  log_stash_host: "logstash"
+  log_stash_port: 5000
+  async: true

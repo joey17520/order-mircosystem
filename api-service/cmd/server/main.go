@@ -4,6 +4,7 @@ import (
 	"log"
 	"order-microsystem/api-service/internal/server"
 	"order-microsystem/api-service/pkg/config"
+	"order-microsystem/api-service/pkg/logger"
 	"order-microsystem/api-service/pkg/tracing"
 	"os"
 	"os/signal"
@@ -28,9 +29,12 @@ func main() {
 		log.Fatalf("failed to initialize tracer: %v", err)
 	}
 
+	// 初始化日志
+	logStash := logger.InitLogger(&cfg.Logger)
+
 	// 调用 server.NewHTTPServer 函数创建一个新的 HTTP 服务器实例，
 	// 传入配置和追踪器。
-	httpServer := server.NewHTTPServer(cfg, tp)
+	httpServer := server.NewHTTPServer(cfg, tp, logStash)
 	// 使用 goroutine 异步启动 HTTP 服务器，避免阻塞主线程。
 	// 如果启动失败，使用 log.Fatalf 输出错误信息并终止程序。
 	go func() {
